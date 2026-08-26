@@ -1,0 +1,114 @@
+================================================================================
+RESUMO DETALHADO DO ARTIGO CIENTÍFICO
+================================================================================
+Título: SkillSight: Efficient First-Person Skill Assessment with Gaze
+Autores: Chi Hsuan Wu, Kumar Ashutosh, Kristen Grauman
+Instituição: University of Texas at Austin (UT Austin)
+Identificador: arXiv:2511.19629v1 [cs.CV] (Novembro de 2025)
+Link Oficial: https://arxiv.org/abs/2511.19629
+Projeto: https://vision.cs.utexas.edu/projects/skillsight/
+================================================================================
+
+1. VISÃO GERAL E MOTIVAÇÃO
+--------------------------------------------------------------------------------
+A avaliação automática do nível de habilidade (Skill Assessment) a partir de uma
+perspectiva em primeira pessoa (egocêntrica / smart glasses) é fundamental para
+tutores inteligentes e aprendizado de habilidades no mundo real (esportes,
+música, culinária, cirurgia).
+
+No entanto, abordagens convencionais enfrentam dois grandes gargalos:
+1. Dependência exclusiva de vídeo RGB: Câmeras contínuas consomem muita energia
+   (inviável para óculos inteligentes compactos) e trazem preocupações de privacidade.
+2. Limitação de visão corporal: Em visão egocêntrica, o próprio corpo do atleta
+   muitas vezes não aparece no enquadramento (ex: pernas, tronco em movimento).
+
+O SkillSight introduz a hipótese central de que o olhar (Gaze / Atenção Visual)
+é um preditor poderoso e discriminativo do nível de perícia do indivíduo.
+Especialistas e novatos olham para coisas diferentes e com dinâmicas temporais
+distintas (fenômeno do Quiet Eye e controle visuo-motor).
+
+================================================================================
+2. FUNDAMENTAÇÃO TEÓRICA E CIÊNCIAS COGNITIVAS (QUIET EYE)
+--------------------------------------------------------------------------------
+O artigo se apoia explicitamente na literatura de psicologia e neurociência motora:
+- Especialistas em esportes fixam o olhar mais cedo no alvo crítico e mantêm
+  fixações estáveis (Quiet Eye) antes de executar a ação motora.
+- No basquete: arremessadores de elite fixam o aro muito antes do lançamento,
+  enquanto novatos olham para a bola ou alternam o foco erraticamente.
+- No futebol: jogadores experientes escaneiam o ambiente ao redor enquanto
+  conduzem a bola, enquanto novatos olham fixamente para os pés/bola.
+- Na música (piano): novatos olham para as mãos 77% do tempo, enquanto
+  especialistas olham 45% (focando mais na partitura e antecipação).
+
+================================================================================
+3. ARQUITETURA DO MODELO (FRAMEWORK MULTIMODAL EM DUAS ETAPAS)
+--------------------------------------------------------------------------------
+O SkillSight propõe uma estrutura Professor-Aluno (Teacher-Student):
+
+A) MODELO PROFESSOR (SkillSight-Teacher - Treinado com Vídeo + Gaze):
+   Combina vídeo RGB egocêntrico com dados de rastreamento do olhar 3D/2D
+   (vetor de direção do olhar, coordenadas 2D na tela, profundidade e rotação da cabeça).
+   Possui 3 módulos principais:
+   1. Interação Ação-Gaze (Action & Gaze Interaction): Modela a correlação
+      entre o movimento global do vídeo e os pontos de fixação do olhar.
+   2. Sequência de Objetos Focados (Attended Object Sequence): Recorta patches
+      da imagem ao redor da coordenada do olhar e codifica os objetos que o
+      indivíduo realmente inspecionou ao longo do tempo.
+   3. Dinâmica do Olhar (Gaze Dynamics): Modela a trajetória pura do olhar
+      (fixações, sacadas, velocidade angular e profundidade).
+   -> Uma camada de fusão agrega essas representações para classificar o nível de habilidade.
+
+B) MODELO ALUNO (SkillSight-Student - Inferência Apenas com Gaze):
+   - Durante a inferência, a câmera de vídeo RGB fica DESLIGADA.
+   - O aluno recebe APENAS as coordenadas e dinâmicas temporais do olhar (Gaze-only).
+   - O aluno é treinado via Destilação de Conhecimento (Knowledge Distillation)
+     usando "distillation tokens" (t_dis) para absorver o conhecimento visual
+     do Teacher e "action recognition tokens" (t_act) para inferir o contexto da ação.
+   - Vantagens: Consome de 14x a 73x MENOS energia que modelos de vídeo, opera
+     em tempo real em hardware vestível e preserva totalmente a privacidade visual.
+
+================================================================================
+4. DATASETS E BENCHMARKS UTILIZADOS
+--------------------------------------------------------------------------------
+O artigo foi validado em três grandes bases de dados multimodais:
+1. Ego-Exo4D:
+   - Cenários: Basquete (arremessos, bandejas/layups), Futebol, Escalada (Bouldering),
+     Dança, Música (Piano, Violino) e Culinária.
+   - Rótulos de habilidade: Novato (Novice), Especialista Inicial (Early Expert),
+     Intermediário (Intermediate) e Avançado (Late Expert).
+2. Multi-Sense Badminton (MSB):
+   - 7.763 jogadas de badminton (forehand/backhand) de 25 jogadores (Iniciante, Intermediário, Expert).
+3. Expert-Novice Soccer:
+   - 288 gravações de 9 movimentos técnicos de futebol (chutes, embaixadinhas, dribles).
+
+================================================================================
+5. RESULTADOS EXPERIMENTAIS E PERFORMANCE
+--------------------------------------------------------------------------------
+- O SkillSight-Teacher (Vídeo + Gaze) superou o estado da arte anterior
+  (TimeSformer, Skillformer, EgoExoLearn) com acurácia média de 50.1% no Ego-Exo4D
+  (ganho relativo de +10% sobre baselines de vídeo puro).
+- O SkillSight-Student (Gaze-Only) alcançou 44.4% de acurácia média geral,
+  superando modelos de eficiência energética que utilizam IMU ou áudio
+  (EgoDistill com 42.6%, EgoTrigger com 34.1%), gastando apenas 9.5 mW de potência
+  (contra 697.5 mW do TimeSformer e 943 mW do Teacher).
+
+================================================================================
+6. PRINCIPAIS DESCOBERTAS NO BASQUETE E RELAÇÃO COM O QUIET EYE
+--------------------------------------------------------------------------------
+1. No basquete (especificamente em bandejas e arremessos do Ego-Exo4D):
+   - Especialistas fixam os olhos no ARO (rim) de forma contínua e antecipada.
+   - Novatos olham repetidamente para baixo em direção à BOLA e às próprias mãos.
+2. O modelo aprendeu sozinho que a estabilidade do vetor do olhar em direção
+   ao aro (Quiet Eye) é a feature mais discriminativa para separar jogadores
+   de elite de iniciantes.
+3. Essas descobertas comprovam computacionalmente as teorias clássicas de Joan Vickers
+   e controle visuo-motor aplicadas ao basquete.
+
+================================================================================
+7. COMO ESSAS DESCOBERTAS AJUDAM O SEU PROJETO / ARTIGO
+--------------------------------------------------------------------------------
+- Você pode usar o Ego-Exo4D (ou subconjuntos de vídeos de basquete) como referência.
+- O SkillSight prova que features derivadas do olhar (onset do QE, duração da fixação
+  no aro, variância do ângulo de pitch/yaw da cabeça) têm altíssimo poder preditivo
+  em Machine Learning para avaliar desempenho esportivo.
+================================================================================
