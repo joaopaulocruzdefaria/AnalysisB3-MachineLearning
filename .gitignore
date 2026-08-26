@@ -27,17 +27,24 @@ wheels/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# Environment variables
+# Environment & IDEs
 .env
 .env.*
-
-# IDEs and editors
 .vscode/
 .idea/
 *.swp
 *.swo
 
 # LaTeX
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.fdb_latexmk
+paper/*.fls
+paper/*.log
+paper/*.out
+paper/*.synctex.gz
+paper/*.toc
 *.aux
 *.bbl
 *.blg
@@ -47,3 +54,13 @@ wheels/
 *.out
 *.synctex.gz
 *.toc
+
+# Datasets pesados / Vídeos (não comitar arquivos binários grandes)
+data/raw/*.mp4
+data/raw/*.avi
+data/raw/*.mov
+data/raw/*.mkv
+
+# Checkpoints e modelos pesados (descomente ou ajuste conforme necessário)
+# models_saved/*.pt
+# models_saved/*.onnx
