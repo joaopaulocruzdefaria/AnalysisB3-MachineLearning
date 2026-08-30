@@ -1,0 +1,84 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{Estimativa Não-Invasiva de Quiet Eye via Visão Computacional e Predição de Desempenho em Lances Livres da NBA usando Modelos Mistos e Machine Learning*\\
+{\footnotesize \textsuperscript{*}Projeto da disciplina de Tópicos Especiais em Sistemas Inteligentes: Aprendizado de Máquina}
+}
+
+\author{\IEEEauthorblockN{João Paulo Cruz de Faria}
+\IEEEauthorblockA{\textit{Departamento de Ciência da Computação / Engenharia} \\
+\textit{Instituição de Ensino Superior}\\
+Email: joaopaulocruzdefaria@gmail.com}
+}
+
+\maketitle
+
+\begin{abstract}
+O \textit{Quiet Eye} (QE) é o período final de fixação visual em um alvo antes da fase motora de um movimento, associado à precisão em tarefas de mira como o lance livre no basquete. Métodos tradicionais de medição exigem rastreadores oculares vestíveis, inviabilizando sua coleta durante partidas oficiais. Este trabalho propõe um pipeline de visão computacional para estimar um \textit{Quiet Eye Proxy} a partir de vídeos de transmissão pública da NBA (720p/1080p a 30/60 FPS). O método combina estimativa de orientação da cabeça (MediaPipe Face Mesh via PnP), detecção híbrida do momento de soltura da bola (fusão de cinemática articular via MediaPipe Pose e rastreamento da trajetória da bola) e controle da duração total da rotina como covariável. Para avaliar o impacto do QE no desfecho do arremesso (acerto ou erro), utilizam-se Modelos Lineares Generalizados de Efeitos Mistos (GLMM) para separar efeitos intra e inter-atletas, além de modelos de aprendizado de máquina (XGBoost e Random Forest) validados com divisão agrupada por jogador (\textit{GroupKFold}). O método permite quantificar o QE em vídeos convencionais de jogos sem a necessidade de sensores dedicados.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Quiet Eye, Visão Computacional, Aprendizado de Máquina, Modelos de Efeitos Mistos, Basquete, MediaPipe, Sports Analytics.
+\end{IEEEkeywords}
+
+\section{Introdução}
+
+\subsection{Contextualização e Relevância}
+A visão computacional permite extrair métricas biomecânicas e comportamentais diretamente de transmissões esportivas. No basquete, o arremesso de lance livre é uma tarefa motora padronizada, sem interferência direta de defensores. Apesar desse ambiente controlado, a taxa de conversão varia substancialmente entre jogadores e oscila entre tentativas do próprio arremessador ao longo da partida.
+
+Na literatura de controle motor, o \textit{Quiet Eye} (QE)~\cite{vickers1996visual} é definido como a fixação visual final em um alvo específico (o aro) antes do início da fase motora de extensão para o arremesso. Meta-análises na área~\cite{lebeau2016quiet} indicam que arremessadores mais precisos mantêm o QE por períodos mais longos e com início mais precoce em comparação com arremessadores menos precisos.
+
+\subsection{Estado da Arte}
+A medição direta do QE depende de óculos de rastreamento ocular (\textit{eye-trackers}) sincronizados com sistemas de captura de movimento~\cite{vickers2007perception}. Embora esses sensores forneçam alta precisão da posição pupilar, seu uso é restrito a laboratórios e incompatível com o contexto de jogos oficiais.
+
+Em paralelo, avanços em visão computacional viabilizaram a análise de atenção visual e cinemática corporal a partir de vídeo RGB. Estudos recentes~\cite{wu2025skillsight} indicam que sinais de foco visual agregam valor preditivo à cinemática corporal na classificação de habilidades motoras. Além disso, modelos como o MediaPipe~\cite{lugaresi2019mediapipe} permitem estimar a orientação tridimensional da cabeça (\textit{head pose}) e as coordenadas articulares do atleta sem necessidade de marcadores físicos ou calibração prévia de câmeras.
+
+\subsection{Lacunas de Pesquisa}
+Apesar desses avanços, a literatura apresenta as seguintes limitações metodológicas:
+\begin{enumerate}
+    \item \textbf{Medição Não-Invasiva em Partidas Oficiais:} Ausência de pipelines públicos validados para extração de métricas de QE a partir de vídeos convencionais de transmissão de jogos da NBA.
+    \item \textbf{Variável de Confusão com a Duração da Rotina:} Avaliações que utilizam apenas o tempo absoluto de fixação sem controlar pela duração total da rotina de arremesso (\textit{confounding bias}). Sem esse controle, não se distingue se o aumento do QE decorre de maior foco visual ou apenas de uma rotina de arremesso mais lenta.
+    \item \textbf{Vazamento de Dados e Efeitos Agrupados (\textit{Data Leakage}):} O uso de validação cruzada aleatória (K-Fold padrão) distribui arremessos do mesmo jogador entre treino e teste. O modelo aprende a identificar o aproveitamento médio do jogador (efeito \textit{between-player}) em vez da relação entre a variação do QE e o acerto no arremesso (efeito \textit{within-player}).
+    \item \textbf{Imprecisão no Momento de Soltura (\textit{Release Offset}):} O término do QE ocorre no instante em que a bola perde contato com os dedos. O uso exclusivo da cinemática dos braços gera erros temporais que distorcem a duração calculada do QE.
+\end{enumerate}
+
+\subsection{Proposta de Trabalho e Contribuições}
+Para tratar essas limitações, este trabalho propõe um pipeline computacional e estatístico para estimar o \textit{Quiet Eye Proxy} e prever o desfecho de lances livres na NBA. As principais contribuições são:
+\begin{itemize}
+    \item \textbf{Pipeline de Visão Computacional para Estimação de QE:} Extração de ângulos de pose da cabeça (\textit{pitch}, \textit{yaw} e \textit{roll}) via MediaPipe Face Mesh e resolução PnP, com interpolação de falhas de rastreamento e suavização temporal para definir a janela de estabilidade do olhar.
+    \item \textbf{Detecção Híbrida de Soltura (\textit{Release}):} Integração entre a cinemática articular (MediaPipe Pose) e o rastreamento da trajetória da bola para identificar o quadro exato em que a bola se separa das mãos.
+    \item \textbf{Modelagem com Separação de Efeitos Intra e Inter-Atleta:} Aplicação de Modelos Lineares Generalizados de Efeitos Mistos (GLMM)~\cite{bates2015fitting} e modelos de aprendizado de máquina (XGBoost~\cite{chen2016xgboost}, Random Forest) avaliados sob \textit{GroupKFold} por jogador, reportando razões de chances (\textit{Odds Ratios} com IC de 95\%) e controlando pela duração da rotina e aproveitamento histórico do jogador (\textit{career FT\%}).
+    \item \textbf{Base de Dados e Validação de Referência:} Construção de uma base com 150 a 200 lances livres balanceados (acertos e erros de 15 atletas da NBA) e validação do proxy em um subconjunto anotado manualmente quadro a quadro, reportando Coeficiente de Correlação Intraclasse (ICC) e Erro Absoluto Médio (MAE).
+\end{itemize}
+
+\section{Revisão da Literatura}
+\textit{[Seção a ser detalhada nas próximas etapas com aprofundamento em neurociência motora, visão computacional aplicada ao esporte e modelos preditivos em basquete.]}
+
+\section{Materiais e Métodos}
+\textit{[Seção a ser detalhada nas próximas etapas com a especificação do dataset, arquitetura dos extratores em \texttt{src/vision/}, engenharia de features em \texttt{src/models/} e protocolo de validação GroupKFold.]}
+
+\section{Resultados e Discussões}
+\textit{[Seção reservada para apresentação das métricas preditivas, Odds Ratios (IC 95\%), análise de importância com SHAP Values~\cite{lundberg2017unified} e correlação ICC do subset de validação.]}
+
+\section{Conclusões, Limitações e Trabalhos Futuros}
+\textit{[Seção de encerramento abordando generalização para arremessos em movimento e integração com novos sensores.]}
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
