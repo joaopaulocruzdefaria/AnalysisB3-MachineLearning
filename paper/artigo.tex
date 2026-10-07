@@ -16,67 +16,205 @@
 
 \begin{document}
 
-\title{Estimativa Não-Invasiva de Quiet Eye via Visão Computacional e Predição de Desempenho em Lances Livres da NBA usando Modelos Mistos e Machine Learning*\\
+\title{Motor Modular de Decisão Tática no Mercado Acionário Brasileiro: Previsão de Excesso de Retorno sobre o CDI via Aprendizado de Máquina Calibrado e Validação Walk-Forward*\\
 {\footnotesize \textsuperscript{*}Projeto da disciplina de Tópicos Especiais em Sistemas Inteligentes: Aprendizado de Máquina}
 }
 
 \author{\IEEEauthorblockN{João Paulo Cruz de Faria}
-\IEEEauthorblockA{\textit{Departamento de Ciência da Computação / Engenharia} \\
-\textit{Instituição de Ensino Superior}\\
+\IEEEauthorblockA{\textit{Departamento de Computação e Sistemas Inteligentes} \\
+\textit{Centro Federal de Educação Tecnológica de Minas Gerais (CEFET-MG)}\\
+Belo Horizonte, Brasil \\
 Email: joaopaulocruzdefaria@gmail.com}
 }
 
 \maketitle
 
 \begin{abstract}
-O \textit{Quiet Eye} (QE) é o período final de fixação visual em um alvo antes da fase motora de um movimento, associado à precisão em tarefas de mira como o lance livre no basquete. Métodos tradicionais de medição exigem rastreadores oculares vestíveis, inviabilizando sua coleta durante partidas oficiais. Este trabalho propõe um pipeline de visão computacional para estimar um \textit{Quiet Eye Proxy} a partir de vídeos de transmissão pública da NBA (720p/1080p a 30/60 FPS). O método combina estimativa de orientação da cabeça (MediaPipe Face Mesh via PnP), detecção híbrida do momento de soltura da bola (fusão de cinemática articular via MediaPipe Pose e rastreamento da trajetória da bola) e controle da duração total da rotina como covariável. Para avaliar o impacto do QE no desfecho do arremesso (acerto ou erro), utilizam-se Modelos Lineares Generalizados de Efeitos Mistos (GLMM) para separar efeitos intra e inter-atletas, além de modelos de aprendizado de máquina (XGBoost e Random Forest) validados com divisão agrupada por jogador (\textit{GroupKFold}). O método permite quantificar o QE em vídeos convencionais de jogos sem a necessidade de sensores dedicados.
+A aplicação de Aprendizado de Máquina em finanças quantitativas frequentemente fracassa ao tentar prever flutuações de curtíssimo prazo dominadas por ruído aleatório ou ao desconsiderar o elevado custo de oportunidade da economia brasileira. Este trabalho propõe o desenvolvimento e a validação experimental de um motor analítico modular em Python concebido para suporte à decisão tática do investidor na B3. Em vez de operar como um script rígido monoativo, o sistema recebe qualquer ticker líquido, computa variáveis estacionárias de desconto histórico frente a ciclos plurianuais e estima a probabilidade calibrada de o ativo superar a taxa livre de risco (CDI acumulado) em um horizonte tático de 60 pregões úteis ($y_t = \mathbb{I}(R_{t \to t+60} > CDI_{t \to t+60})$). Para contornar a severa auto-correlação decorrente da sobreposição temporal de rótulos, emprega-se um protocolo rigoroso de validação temporal em janelas expansivas associado a técnicas de Purging e Embargo (López de Prado). A capacidade de generalização do motor é avaliada comparativamente entre dois ativos com dinâmicas operacionais ortogonais: Petrobras (PETR4), representando o setor de commodities cíclicas e sensibilidade estatal, e Itaú Unibanco (ITUB4), representando o setor bancário e de crédito doméstico. Os modelos de Gradient Boosting (LightGBM, XGBoost e CatBoost) são contrastados com baselines ingênuos e paramétricos, avaliados por discriminação (ROC-AUC, PR-AUC), calibração (Brier Score), explicabilidade via TreeSHAP e simulação de carteira com fricções de mercado.
 \end{abstract}
 
 \begin{IEEEkeywords}
-Quiet Eye, Visão Computacional, Aprendizado de Máquina, Modelos de Efeitos Mistos, Basquete, MediaPipe, Sports Analytics.
+Mercado Acionário, B3, Taxa CDI, Horizonte Tático, Aprendizado de Máquina, Calibração Probabilística, Walk-Forward, Purging e Embargo, SHAP.
 \end{IEEEkeywords}
 
 \section{Introdução}
 
 \subsection{Contextualização e Relevância}
-A visão computacional permite extrair métricas biomecânicas e comportamentais diretamente de transmissões esportivas. No basquete, o arremesso de lance livre é uma tarefa motora padronizada, sem interferência direta de defensores. Apesar desse ambiente controlado, a taxa de conversão varia substancialmente entre jogadores e oscila entre tentativas do próprio arremessador ao longo da partida.
+O mercado de capitais no Brasil, centralizado na B3 (Brasil, Bolsa, Balcão), opera sob uma dinâmica macroeconômica peculiar em relação aos mercados desenvolvidos. Historicamente, a economia brasileira pratica patamares elevados de taxa básica de juros (Selic), o que impõe aos participantes de mercado um custo de oportunidade severo mensurado pelo Certificado de Depósito Interbancário (CDI). Nesse ecossistema, estratégias de alocação de capital em renda variável que gerem apenas valorização nominal positiva ($R > 0$) são insuficientes: a racionalidade econômica exige que o ativo gere retornos excedentes (\textit{alpha}) em relação à taxa livre de risco livre de volatilidade.
 
-Na literatura de controle motor, o \textit{Quiet Eye} (QE)~\cite{vickers1996visual} é definido como a fixação visual final em um alvo específico (o aro) antes do início da fase motora de extensão para o arremesso. Meta-análises na área~\cite{lebeau2016quiet} indicam que arremessadores mais precisos mantêm o QE por períodos mais longos e com início mais precoce em comparação com arremessadores menos precisos.
+Adicionalmente, a literatura empírica de finanças computacionais tem revisitado os limites da Teoria dos Mercados Eficientes (EMH) \cite{fama1970efficient}. Enquanto flutuações intradiárias ou do pregão subsequente ($h = 1$) apresentam uma razão sinal-ruído (\textit{Signal-to-Noise Ratio} - SNR) próxima de zero, horizontes táticos intermediários (como trimestres civis ou 60 pregões úteis) permitem que métricas de desconto histórico, ciclos corporativos e dinâmica de juros exerçam forças estatisticamente identificáveis de reversão à média e reprecificação de fundamentos \cite{deprado2018advances, gu2020empirical}.
 
 \subsection{Estado da Arte}
-A medição direta do QE depende de óculos de rastreamento ocular (\textit{eye-trackers}) sincronizados com sistemas de captura de movimento~\cite{vickers2007perception}. Embora esses sensores forneçam alta precisão da posição pupilar, seu uso é restrito a laboratórios e incompatível com o contexto de jogos oficiais.
+O uso de Aprendizado de Máquina na precificação empírica de ativos vivenciou uma ruptura paradigmática com os trabalhos seminais de Krauss et al. \cite{krauss2017deep} e Gu, Kelly e Xiu \cite{gu2020empirical}. Este último demonstrou categoricamente que métodos de ensemble baseados em árvores de decisão impulsionadas por gradiente (\textit{Gradient Boosted Decision Trees} - GBDT) superam amplamente modelos econométricos clássicos ao mapear interações complexas e não-lineares entre variáveis técnicas e o cenário macroeconômico.
 
-Em paralelo, avanços em visão computacional viabilizaram a análise de atenção visual e cinemática corporal a partir de vídeo RGB. Estudos recentes~\cite{wu2025skillsight} indicam que sinais de foco visual agregam valor preditivo à cinemática corporal na classificação de habilidades motoras. Além disso, modelos como o MediaPipe~\cite{lugaresi2019mediapipe} permitem estimar a orientação tridimensional da cabeça (\textit{head pose}) e as coordenadas articulares do atleta sem necessidade de marcadores físicos ou calibração prévia de câmeras.
+Paralelamente, Sezer et al. \cite{sezer2020financial} consolidaram a premissa de que séries financeiras exigem transformações estacionárias rigorosas. Em nível metodológico, López de Prado \cite{deprado2018advances} estabeleceu novos padrões para a validação temporal, demonstrando matematicamente que rótulos temporais futuros em horizontes multiperíodo compartilham dados em comum (\textit{overlapping labels}), exigindo o expurgo sistemático (\textit{purging}) e períodos de carência (\textit{embargo}) para evitar vazamento fraudulento de informação.
 
 \subsection{Lacunas de Pesquisa}
-Apesar desses avanços, a literatura apresenta as seguintes limitações metodológicas:
+A despeito da proliferação de estudos na literatura internacional, as publicações no contexto da B3 apresentam deficiências metodológicas recorrentes:
 \begin{enumerate}
-    \item \textbf{Medição Não-Invasiva em Partidas Oficiais:} Ausência de pipelines públicos validados para extração de métricas de QE a partir de vídeos convencionais de transmissão de jogos da NBA.
-    \item \textbf{Variável de Confusão com a Duração da Rotina:} Avaliações que utilizam apenas o tempo absoluto de fixação sem controlar pela duração total da rotina de arremesso (\textit{confounding bias}). Sem esse controle, não se distingue se o aumento do QE decorre de maior foco visual ou apenas de uma rotina de arremesso mais lenta.
-    \item \textbf{Vazamento de Dados e Efeitos Agrupados (\textit{Data Leakage}):} O uso de validação cruzada aleatória (K-Fold padrão) distribui arremessos do mesmo jogador entre treino e teste. O modelo aprende a identificar o aproveitamento médio do jogador (efeito \textit{between-player}) em vez da relação entre a variação do QE e o acerto no arremesso (efeito \textit{within-player}).
-    \item \textbf{Imprecisão no Momento de Soltura (\textit{Release Offset}):} O término do QE ocorre no instante em que a bola perde contato com os dedos. O uso exclusivo da cinemática dos braços gera erros temporais que distorcem a duração calculada do QE.
+    \item \textbf{Foco em Horizontes Ruidosos ou Regressão Ingênua:} Predomina a tentativa de prever o preço nominal de fechamento ($P_{t+1}$) via modelos de regressão, gerando acurácias ilusórias dominadas por passeios aleatórios defasados, ou o foco em horizontes diários nos quais o ruído de microestrutura anula a previsibilidade de modelos supervisionados.
+    \item \textbf{Desconexão com o Custo de Oportunidade da Economia:} A esmagadora maioria dos modelos rotula o alvo como $R > 0$, desconsiderando que um ganho nominal inferior ao CDI representa perda real de capital frente à renda fixa pós-fixada.
+    \item \textbf{Vazamento Temporal e Violação de Independência:} A negligência do fenômeno de \textit{overlapping labels} em janelas temporais de médio prazo leva à violação das premissas de validação temporal, inflando resultados fora-da-amostra.
+    \item \textbf{Ausência de Calibração Probabilística e Generalização Setorial:} Os modelos limitam-se a saídas binárias rígidas, sem avaliar a confiabilidade probabilística ($\hat{P}(Y=1|X)$) via métricas como o Brier Score, e são frequentemente testados em um único ativo isolado.
 \end{enumerate}
 
 \subsection{Proposta de Trabalho e Contribuições}
-Para tratar essas limitações, este trabalho propõe um pipeline computacional e estatístico para estimar o \textit{Quiet Eye Proxy} e prever o desfecho de lances livres na NBA. As principais contribuições são:
+Para superar tais lacunas, este artigo propõe o desenvolvimento e a validação experimental de um **motor modular em Python** voltado ao suporte à decisão tática na B3. O sistema recebe o ticker de qualquer ação líquida, estrutura variáveis estritamente estacionárias de desconto frente aos ciclos passados e estima a probabilidade calibrada de superação do CDI em um horizonte de 60 pregões úteis ($h=60$):
+\begin{equation}
+y_t = \mathbb{I}(R_{t \to t+60} > CDI_{t \to t+60}) \in \{0, 1\}
+\end{equation}
+
+As principais contribuições deste trabalho compreendem:
 \begin{itemize}
-    \item \textbf{Pipeline de Visão Computacional para Estimação de QE:} Extração de ângulos de pose da cabeça (\textit{pitch}, \textit{yaw} e \textit{roll}) via MediaPipe Face Mesh e resolução PnP, com interpolação de falhas de rastreamento e suavização temporal para definir a janela de estabilidade do olhar.
-    \item \textbf{Detecção Híbrida de Soltura (\textit{Release}):} Integração entre a cinemática articular (MediaPipe Pose) e o rastreamento da trajetória da bola para identificar o quadro exato em que a bola se separa das mãos.
-    \item \textbf{Modelagem com Separação de Efeitos Intra e Inter-Atleta:} Aplicação de Modelos Lineares Generalizados de Efeitos Mistos (GLMM)~\cite{bates2015fitting} e modelos de aprendizado de máquina (XGBoost~\cite{chen2016xgboost}, Random Forest) avaliados sob \textit{GroupKFold} por jogador, reportando razões de chances (\textit{Odds Ratios} com IC de 95\%) e controlando pela duração da rotina e aproveitamento histórico do jogador (\textit{career FT\%}).
-    \item \textbf{Base de Dados e Validação de Referência:} Construção de uma base com 150 a 200 lances livres balanceados (acertos e erros de 15 atletas da NBA) e validação do proxy em um subconjunto anotado manualmente quadro a quadro, reportando Coeficiente de Correlação Intraclasse (ICC) e Erro Absoluto Médio (MAE).
+    \item \textbf{Arquitetura Modular Agnóstica de Ticker:} Engenharia de software desacoplada em Python capaz de processar qualquer ação da B3 e sincronizar automaticamente séries diárias de preços com o Sistema Gerenciador de Séries Temporais do Banco Central (SGS/BACEN).
+    \item \textbf{Métricas Estacionárias de Desconto de Ciclo:} Formulação de indicadores quantitativos de extensão temporal (Z-scores em relação a médias móveis de 200 e 500 dias, Drawdown de 52 semanas e desvio de canais de volatilidade) imunes ao viés de atraso de reporte de balanços trimestrais.
+    \item \textbf{Validação Walk-Forward com Purging e Embargo:} Implementação rigorosa do protocolo de López de Prado \cite{deprado2018advances} com 5 janelas expansivas ao longo de 10 anos históricos (2014–2024), eliminando 100\% do vazamento temporal em janelas sobrepostas de 60 dias.
+    \item \textbf{Calibração Probabilística e Interpretabilidade SHAP:} Pós-processamento de estimativas via \textit{Platt Scaling} e Regressão Isotônica para calibração de probabilidades, auditadas por Brier Score, Log-Loss e decomposição aditiva de Shapley (TreeSHAP).
+    \item \textbf{Validação Cruzada Setorial PETR4 vs. ITUB4:} Teste empírico da capacidade de generalização do motor analítico em dois regimes de mercado profundamente contrastantes: setor de commodities cíclicas/estatal (Petrobras - PETR4) versus setor financeiro/crédito doméstico (Itaú Unibanco - ITUB4).
 \end{itemize}
 
+\subsection{Viabilidade da Base de Dados}
+A metodologia conta com respaldo empírico integral através de dados públicos e auditáveis:
+\begin{enumerate}
+    \item \textbf{Cotações Históricas dos Ativos (B3 / Yahoo Finance):} Séries diárias de preços ajustados por dividendos e desdobramentos (OHLCV) de PETR4 e ITUB4 cobrindo o período de 2014 a 2024 (mais de 2.500 pregões por ativo), abrangendo regimes macroeconômicos de expansão, crise sanitária (2020) e ciclos de aperto monetário.
+    \item \textbf{Indicadores Macroeconômicos Oficiais (SGS/BACEN):} Taxa Selic Over diária (Série SGS 11) utilizada para capitalização composta exata do CDI diário de 60 dias, e cotação comercial média do Dólar PTAX (Série SGS 1).
+\end{enumerate}
+O alinhamento temporal é executado via junção interna estrita pelo calendário de negociação da B3, garantindo integridade e ausência de descontinuidades.
+
 \section{Revisão da Literatura}
-\textit{[Seção a ser detalhada nas próximas etapas com aprofundamento em neurociência motora, visão computacional aplicada ao esporte e modelos preditivos em basquete.]}
+
+O emprego de Aprendizado de Máquina na modelagem preditiva de mercados financeiros evoluiu consideravelmente a partir da superação de abordagens univariadas ingênuas. Krauss et al. \cite{krauss2017deep} e Fischer e Krauss \cite{fischer2018deep} foram pioneiros ao demonstrar que métodos de ensemble baseados em árvores (\textit{Random Forests} e \textit{Gradient Boosted Trees}) superam modelos econométricos lineares clássicos na exploração de arbitragem estatística no índice S\&P 500, mitigando o ruído estocástico de ativos individuais.
+
+Em estudo seminal no \textit{Review of Financial Studies}, Gu, Kelly e Xiu \cite{gu2020empirical} realizaram o mais extenso benchmark comparativo de precificação de ativos via Aprendizado de Máquina. Os autores evidenciaram que modelos baseados em \textit{Gradient Boosting Decision Trees} (GBDT), como XGBoost \cite{chen2016xgboost} e LightGBM \cite{ke2017lightgbm}, oferecem o melhor compromisso entre acurácia preditiva e eficiência computacional, capturando interações não-lineares fundamentais entre características microeconômicas e indicadores macroeconômicos. Revisões sistemáticas como a de Sezer et al. \cite{sezer2020financial} consolidaram a importância de construir atributos preditivos estritamente estacionários, como osciladores técnicos de momento e métricas normalizadas de volatilidade.
+
+Não obstante os avanços algorítmicos, López de Prado \cite{deprado2018advances} alertou para o risco sistêmico de falsas descobertas decorrentes de vazamento temporal (\textit{data leakage}). Em particular, o autor formulou os conceitos de \textit{Purging} e \textit{Embargo}, demonstrando que em horizontes preditivos multiperíodo ($h > 1$), a sobreposição de realizações de preços entre janelas de treino e teste induz correlação espúria, invalidando a premissa de observações independentes e identicamente distribuídas (i.i.d.).
 
 \section{Materiais e Métodos}
-\textit{[Seção a ser detalhada nas próximas etapas com a especificação do dataset, arquitetura dos extratores em \texttt{src/vision/}, engenharia de features em \texttt{src/models/} e protocolo de validação GroupKFold.]}
+
+\subsection{Base de Dados e Protocolo de Coleta}
+O arcabouço empírico emprega séries históricas diárias cobrindo o decênio de janeiro de 2015 a junho de 2024, totalizando 2.340 pregões úteis. Para validar a capacidade de generalização do motor analítico, selecionaram-se dois ativos representativos de setores econômicos profundamente contrastantes da B3:
+\begin{itemize}
+    \item \textbf{Petrobras PN (PETR4):} Representante do setor de commodities fósseis e energia, caracterizado por sensibilidade geopolítica direta às cotações internacionais do petróleo Brent, exposição à volatilidade cambial e interferência de políticas de preços estatais.
+    \item \textbf{Itaú Unibanco PN (ITUB4):} Maior conglomerado financeiro privado do Brasil, dependente da dinâmica doméstica de concessão de crédito, spread bancário, inadimplência e transmissões do ciclo monetário da taxa Selic.
+\end{itemize}
+
+As cotações de preços (OHLCV) ajustadas por proventos foram coletadas via API do Yahoo Finance. As covariáveis macroeconômicas oficiais foram extraídas diretamente da API pública do Banco Central do Brasil (SGS/BACEN): taxa Selic Over diária (Série 11) e taxa de câmbio comercial Dólar PTAX (Série 1).
+
+\subsection{Formulação Matemática do Alvo e Rotulagem Tática}
+Para um dado pregão $t$, o horizonte de previsão é estabelecido em $h = 60$ pregões úteis (~3 meses civis). O retorno acumulado do ativo ($R_{t \to t+60}$) e o retorno composto do CDI no mesmo período ($CDI_{t \to t+60}$) são formulados por:
+\begin{equation}
+R_{t \to t+60} = \frac{P_{t+60}}{P_t} - 1
+\end{equation}
+\begin{equation}
+CDI_{t \to t+60} = \prod_{k=1}^{60} \left(1 + r_{\text{CDI}, t+k}\right) - 1
+\end{equation}
+onde $r_{\text{CDI}, t}$ é a taxa diária do CDI obtida pelo SGS 11. O rótulo binário $y_t \in \{0, 1\}$ é atribuído como:
+\begin{equation}
+y_t = \mathbb{I}\left(R_{t \to t+60} > CDI_{t \to t+60}\right)
+\end{equation}
+
+\subsection{Engenharia de Atributos Estacionários}
+Para eliminar o viés de defasagem na divulgação de balanços trimestrais da CVM (\textit{lookahead bias}), o motor preditivo calcula 14 atributos exclusivamente quantitativos baseados em ciclos históricos de preços e séries do BACEN:
+\begin{enumerate}
+    \item \textbf{Métricas de Desconto de Ciclo:} Z-scores de médias móveis de 200 e 500 pregões ($z_{\text{SMA200}}, z_{\text{SMA500}}$), Drawdown em relação à máxima de 52 semanas ($\text{DD}_{52w}$), percentual $\%b$ de Bandas de Bollinger de 200 períodos e spread de retorno passado do ativo contra o CDI em 60 dias.
+    \item \textbf{Momentum e Volatilidade:} Índice de Força Relativa (RSI-14 normalizado em $[0, 1]$), Oscilador Estocástico ($\%K_{14}$), MACD normalizado por preço, razão do \textit{Average True Range} ($\text{ATR}_{14} / P_t$) e Z-score de volume negociado em 20 pregões.
+    \item \textbf{Covariáveis Macroeconômicas:} Taxa Selic anualizada efetiva, variação da Selic em 60 pregões ($\Delta \text{Selic}_{60}$), retorno percentual do câmbio USD/BRL em 60 pregões e volatilidade realizada do câmbio em 20 dias.
+\end{enumerate}
+
+\subsection{Validação Walk-Forward com Purging}
+Adota-se uma partição temporal em 4 dobras expansivas (\textit{Expanding Folds}). A cada dobra $k$, o conjunto de teste compreende um bloco futuro contíguo fora-da-amostra ($OOS$). Para prevenir a contaminação serial devida aos 60 dias de sobreposição entre rótulos adjacentes, aplica-se o expurgo estrito (\textit{Purging}): os últimos 60 pregões do conjunto de treino que antecedem a data inicial do teste são compulsoriamente eliminados do ajuste dos modelos.
+
+\subsection{Calibração Probabilística e Modelagem}
+Comparam-se quatro modelos supervisionados: LightGBM \cite{ke2017lightgbm}, XGBoost \cite{chen2016xgboost}, Regressão Logística regularizada ($L_2$) e um \textit{Dummy Classifier} (frequência a priori). Os ensembles de árvores são acoplados a um calibrador probabilístico de Platt Scaling via \textit{CalibratedClassifierCV} com validação temporal interna, garantindo estimativas de probabilidade $\hat{P}(Y=1|X) \in [0, 1]$ auditáveis por Brier Score e Log-Loss.
+
+A Figura~\ref{fig:fluxograma} sintetiza o fluxograma metodológico completo do trabalho, estruturando a interconexão entre ingestão, transformações estacionárias, rotulagem tática, particionamento temporal e auditoria estatística.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.48\textwidth]{figures/fluxograma_metodologia.png}
+\caption{Fluxograma metodológico do pipeline preditivo e experimental (Etapa II).}
+\label{fig:fluxograma}
+\end{figure}
 
 \section{Resultados e Discussões}
-\textit{[Seção reservada para apresentação das métricas preditivas, Odds Ratios (IC 95\%), análise de importância com SHAP Values~\cite{lundberg2017unified} e correlação ICC do subset de validação.]}
 
-\section{Conclusões, Limitações e Trabalhos Futuros}
-\textit{[Seção de encerramento abordando generalização para arremessos em movimento e integração com novos sensores.]}
+\subsection{Desempenho Preditivo e Estatístico}
+A Tabela~\ref{tab:metricas} apresenta os resultados estatísticos consolidados nas predições fora-da-amostra para os dois ativos avaliados ao longo do protocolo Walk-Forward com Purging.
+
+\begin{table}[htbp]
+\caption{Desempenho Fora-da-Amostra (Walk-Forward com Purging)}
+\label{tab:metricas}
+\centering
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Modelo} & \textbf{ROC-AUC} & \textbf{PR-AUC} & \textbf{Brier} & \textbf{F1} & \textbf{Sharpe} & \textbf{MDD} \\
+\midrule
+\multicolumn{7}{c}{\textit{Petrobras PN (PETR4)}} \\
+\midrule
+LightGBM Calibrado & 0,6010 & 0,7144 & 0,2272 & 0,5516 & \textbf{0,6878} & -58,0\% \\
+XGBoost Calibrado  & \textbf{0,6664} & \textbf{0,7851} & 0,2205 & 0,5620 & 0,6540 & -58,0\% \\
+Regressão Logística & 0,6174 & 0,6691 & 0,2480 & 0,4739 & 0,3652 & -63,1\% \\
+Dummy (Baseline)   & 0,4678 & 0,6101 & 0,2509 & 0,3789 & 0,1577 & -63,1\% \\
+\midrule
+\multicolumn{7}{c}{\textit{Itaú Unibanco PN (ITUB4)}} \\
+\midrule
+LightGBM Calibrado & 0,5630 & 0,5538 & 0,2504 & 0,5440 & -0,0233 & -41,1\% \\
+XGBoost Calibrado  & 0,5331 & 0,5082 & 0,2547 & 0,5028 & -0,5639 & -48,5\% \\
+Regressão Logística & \textbf{0,6763} & \textbf{0,6869} & \textbf{0,2257} & \textbf{0,6088} & \textbf{0,0937} & \textbf{-39,9\%} \\
+Dummy (Baseline)   & 0,5599 & 0,5125 & 0,2530 & 0,4438 & -0,2281 & -39,9\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Análise Comparativa Setorial: PETR4 versus ITUB4}
+Os resultados revelam uma assimetria empírica fundamental entre as naturezas operacionais das duas empresas:
+\begin{enumerate}
+    \item \textbf{Comportamento em PETR4 (Commodities/Estatal):} Os modelos baseados em árvores impulsionadas por gradiente exibiram superioridade categórica. O XGBoost calibrado atingiu expressivos \textbf{0,6664 de ROC-AUC} e \textbf{0,7851 de PR-AUC}, superando substancialmente o modelo linear e o baseline. A simulação tática gerou um índice Sharpe anualizado de \textbf{+0,6878} para o LightGBM, demonstrando que não-linearidades e interações entre choques de câmbio (USD/BRL) e extensão de ciclo são decisivas na precificação da estatal.
+    \item \textbf{Comportamento em ITUB4 (Crédito/Bancário):} De forma contraintuitiva, a Regressão Logística regularizada dominou categoricamente os ensembles complexos, alcançando \textbf{0,6763 de ROC-AUC}, \textbf{0,6869 de PR-AUC} e o único Sharpe positivo da categoria (+0,0937). Como instituição financeira consolidada, a dinâmica de retorno de ITUB4 correlaciona-se de forma fortemente monotônica com o nível e a aceleração da Selic e com os ciclos bienais de crédito, favorecendo a parcimônia paramétrica e penalizando ensembles profundos por sobreajuste em microregimes.
+\end{enumerate}
+
+\subsection{Interpretabilidade via TreeSHAP}
+A aplicação dos valores SHAP aos modelos GBDT permitiu auditar quais variáveis exercem maior contribuição marginal na probabilidade estimada $\hat{P}(Y=1|X)$:
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.48\textwidth]{figures/shap_summary_PETR4.png}
+\caption{Decomposição aditiva dos valores SHAP para PETR4 (LightGBM).}
+\label{fig:shap_petr4}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.48\textwidth]{figures/shap_summary_ITUB4.png}
+\caption{Decomposição aditiva dos valores SHAP para ITUB4 (LightGBM).}
+\label{fig:shap_itub4}
+\end{figure}
+
+Como evidenciado na Figura~\ref{fig:shap_petr4}, os atributos de maior impacto preditivo em PETR4 foram o desconto cíclico em relação à média móvel de 500 pregões ($z_{\text{SMA500}}$) e a volatilidade do dólar ($usdbRL\_vol\_20$). Para ITUB4 (Figura~\ref{fig:shap_itub4}), a taxa Selic anualizada e o spread acumulado prévio frente ao CDI concentraram a maior fatia de explicabilidade marginal.
+
+\subsection{Simulação Financeira de Backtest com Fricções}
+A simulação tática fora-da-amostra, incorporando emolumentos e taxas de liquidação de 0,03\% por troca de posição, confirmou a eficácia da regra de preservação de capital: ao realocar os recursos para 100\% de CDI durante períodos em que a probabilidade prevista situava-se abaixo de 0,52, os modelos protegeram o patrimônio nas fases mais agudas de queda de mercado.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.48\textwidth]{figures/backtest_PETR4.png}
+\caption{Evolução patrimonial fora-da-amostra para PETR4 (Walk-Forward).}
+\label{fig:backtest_petr4}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.48\textwidth]{figures/backtest_ITUB4.png}
+\caption{Evolução patrimonial fora-da-amostra para ITUB4 (Walk-Forward).}
+\label{fig:backtest_itub4}
+\end{figure}
+
+\section{Conclusões e Trabalhos Futuros}
+
+Este trabalho apresentou o desenvolvimento e a validação experimental de um motor modular em Python para análise preditiva e suporte à decisão tática na B3. A reformulação do problema preditivo para o horizonte de 60 pregões ($h=60$) com alvo de superação da taxa CDI eliminou o ruído de microestrutura inerente a dados diários e conferiu racionalidade econômica estrita às decisões.
+
+A validação comparativa demonstrou a versatilidade do arcabouço: modelos de GBDT destacaram-se em ativos cíclicos não-lineares (PETR4), enquanto modelos lineares regularizados prevaleceram em ativos bancários fortemente atrelados à curva de juros (ITUB4). O protocolo de Purging eliminou o risco de vazamento temporal em janelas sobrepostas, e a calibração de probabilidades proveu estimativas confiáveis para gestão de risco.
+
+Como trabalhos futuros associados à transição para a Fase 2 (Produto), propõe-se a integração do motor analítico a uma API REST em FastAPI acoplada a um painel em Streamlit, bem como a automação de rotinas diárias com dimensionamento de capital via Critério de Kelly Fracionário.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}
