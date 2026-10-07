@@ -85,9 +85,14 @@ O alinhamento temporal é executado via junção interna estrita pelo calendári
 
 O emprego de Aprendizado de Máquina na modelagem preditiva de mercados financeiros evoluiu consideravelmente a partir da superação de abordagens univariadas ingênuas. Krauss et al. \cite{krauss2017deep} e Fischer e Krauss \cite{fischer2018deep} foram pioneiros ao demonstrar que métodos de ensemble baseados em árvores (\textit{Random Forests} e \textit{Gradient Boosted Trees}) superam modelos econométricos lineares clássicos na exploração de arbitragem estatística no índice S\&P 500, mitigando o ruído estocástico de ativos individuais.
 
-Em estudo seminal no \textit{Review of Financial Studies}, Gu, Kelly e Xiu \cite{gu2020empirical} realizaram o mais extenso benchmark comparativo de precificação de ativos via Aprendizado de Máquina. Os autores evidenciaram que modelos baseados em \textit{Gradient Boosting Decision Trees} (GBDT), como XGBoost \cite{chen2016xgboost} e LightGBM \cite{ke2017lightgbm}, oferecem o melhor compromisso entre acurácia preditiva e eficiência computacional, capturando interações não-lineares fundamentais entre características microeconômicas e indicadores macroeconômicos. Revisões sistemáticas como a de Sezer et al. \cite{sezer2020financial} consolidaram a importância de construir atributos preditivos estritamente estacionários, como osciladores técnicos de momento e métricas normalizadas de volatilidade.
+Em estudo seminal no \textit{Review of Financial Studies}, Gu, Kelly e Xiu \cite{gu2020empirical} realizaram o mais extenso benchmark comparativo de precificação de ativos via Aprendizado de Máquina. Os autores evidenciaram que modelos baseados em \textit{Gradient Boosting Decision Trees} (GBDT), como XGBoost \cite{chen2016xgboost} e LightGBM \cite{ke2017lightgbm}, oferecem o melhor compromisso entre acurácia preditiva e eficiência computacional, capturando interações não-lineares fundamentais entre características microeconômicas e indicadores macroeconômicos. Revisões sistemáticas como a de Sezer et al. \cite{sezer2020financial} consolidaram a premissa de que séries temporais financeiras exigem transformações estacionárias rigorosas para viabilizar o aprendizado supervisionado estável.
 
-Não obstante os avanços algorítmicos, López de Prado \cite{deprado2018advances} alertou para o risco sistêmico de falsas descobertas decorrentes de vazamento temporal (\textit{data leakage}). Em particular, o autor formulou os conceitos de \textit{Purging} e \textit{Embargo}, demonstrando que em horizontes preditivos multiperíodo ($h > 1$), a sobreposição de realizações de preços entre janelas de treino e teste induz correlação espúria, invalidando a premissa de observações independentes e identicamente distribuídas (i.i.d.).
+No contexto específico do mercado acionário brasileiro (B3), a literatura recente tem convergido para o potencial preditivo de modelos de ensemble baseados em árvores. Silva e Sátiro \cite{silva2024poder} avaliaram o desempenho de algoritmos de \textit{boosting} em ativos da B3, demonstrando que CatBoost, XGBoost e LightGBM superam métodos econométricos convencionais na modelagem de retornos futuros. Complementarmente, Carosia \cite{carosia2023using} evidenciou a eficácia de ensembles de árvores (Random Forest e XGBoost) em identificar regimes de deterioração de mercado na B3 e atuar na preservação defensiva de capital. Mais recentemente, Rosa et al. \cite{rosa2025brazilian} analisaram especificamente ativos de alta liquidez da bolsa brasileira, com destaque empírico para Petrobras (PETR4) e Itaú Unibanco (ITUB4), atestando a relevância da integração de séries temporais financeiras para mitigar erros preditivos.
+
+\subsection{Análise Crítica e Posicionamento}
+Apesar dos avanços observados nos estudos recentes sobre a B3 \cite{rosa2025brazilian, silva2024poder, carosia2023using}, uma análise crítica revela deficiências metodológicas persistentes: (i) a prevalência de formulações baseadas em regressão do preço diário nominal ou alvos direcionais ingênuos ($R > 0$), que desconsideram o elevado custo de oportunidade da economia brasileira indexado ao CDI; (ii) a ausência de calibração probabilística rigorosa das saídas para suporte à gestão de risco; e (iii) a negligência quanto ao risco de vazamento temporal (\textit{data leakage}).
+
+Conforme alertado por López de Prado \cite{deprado2018advances}, horizontes preditivos multiperíodo ($h > 1$) geram sobreposição de realizações de preços entre instâncias consecutivas (\textit{overlapping labels}), violando o pressuposto de independência estatística (i.i.d.) se não forem devidamente expurgados. A presente pesquisa diferencia-se e posiciona-se na literatura ao introduzir um motor modular agnóstico de ticker que: (1) estabelece o excesso sobre o CDI em horizonte tático de 60 pregões ($h=60$) como alvo formal; (2) implementa de forma sistemática o protocolo estrito de \textit{Purging} temporal para eliminar o vazamento de informação em janelas sobrepostas; e (3) calibra probabilisticamente modelos GBDT para confrontar empiricamente os contrastes estruturais entre uma estatal de commodities cíclicas (PETR4) e um conglomerado financeiro privado de crédito (ITUB4).
 
 \section{Materiais e Métodos}
 
@@ -135,86 +140,6 @@ A Figura~\ref{fig:fluxograma} sintetiza o fluxograma metodológico completo do t
 \caption{Fluxograma metodológico do pipeline preditivo e experimental (Etapa II).}
 \label{fig:fluxograma}
 \end{figure}
-
-\section{Resultados e Discussões}
-
-\subsection{Desempenho Preditivo e Estatístico}
-A Tabela~\ref{tab:metricas} apresenta os resultados estatísticos consolidados nas predições fora-da-amostra para os dois ativos avaliados ao longo do protocolo Walk-Forward com Purging.
-
-\begin{table}[htbp]
-\caption{Desempenho Fora-da-Amostra (Walk-Forward com Purging)}
-\label{tab:metricas}
-\centering
-\begin{tabular}{lcccccc}
-\toprule
-\textbf{Modelo} & \textbf{ROC-AUC} & \textbf{PR-AUC} & \textbf{Brier} & \textbf{F1} & \textbf{Sharpe} & \textbf{MDD} \\
-\midrule
-\multicolumn{7}{c}{\textit{Petrobras PN (PETR4)}} \\
-\midrule
-LightGBM Calibrado & 0,6010 & 0,7144 & 0,2272 & 0,5516 & \textbf{0,6878} & -58,0\% \\
-XGBoost Calibrado  & \textbf{0,6664} & \textbf{0,7851} & 0,2205 & 0,5620 & 0,6540 & -58,0\% \\
-Regressão Logística & 0,6174 & 0,6691 & 0,2480 & 0,4739 & 0,3652 & -63,1\% \\
-Dummy (Baseline)   & 0,4678 & 0,6101 & 0,2509 & 0,3789 & 0,1577 & -63,1\% \\
-\midrule
-\multicolumn{7}{c}{\textit{Itaú Unibanco PN (ITUB4)}} \\
-\midrule
-LightGBM Calibrado & 0,5630 & 0,5538 & 0,2504 & 0,5440 & -0,0233 & -41,1\% \\
-XGBoost Calibrado  & 0,5331 & 0,5082 & 0,2547 & 0,5028 & -0,5639 & -48,5\% \\
-Regressão Logística & \textbf{0,6763} & \textbf{0,6869} & \textbf{0,2257} & \textbf{0,6088} & \textbf{0,0937} & \textbf{-39,9\%} \\
-Dummy (Baseline)   & 0,5599 & 0,5125 & 0,2530 & 0,4438 & -0,2281 & -39,9\% \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Análise Comparativa Setorial: PETR4 versus ITUB4}
-Os resultados revelam uma assimetria empírica fundamental entre as naturezas operacionais das duas empresas:
-\begin{enumerate}
-    \item \textbf{Comportamento em PETR4 (Commodities/Estatal):} Os modelos baseados em árvores impulsionadas por gradiente exibiram superioridade categórica. O XGBoost calibrado atingiu expressivos \textbf{0,6664 de ROC-AUC} e \textbf{0,7851 de PR-AUC}, superando substancialmente o modelo linear e o baseline. A simulação tática gerou um índice Sharpe anualizado de \textbf{+0,6878} para o LightGBM, demonstrando que não-linearidades e interações entre choques de câmbio (USD/BRL) e extensão de ciclo são decisivas na precificação da estatal.
-    \item \textbf{Comportamento em ITUB4 (Crédito/Bancário):} De forma contraintuitiva, a Regressão Logística regularizada dominou categoricamente os ensembles complexos, alcançando \textbf{0,6763 de ROC-AUC}, \textbf{0,6869 de PR-AUC} e o único Sharpe positivo da categoria (+0,0937). Como instituição financeira consolidada, a dinâmica de retorno de ITUB4 correlaciona-se de forma fortemente monotônica com o nível e a aceleração da Selic e com os ciclos bienais de crédito, favorecendo a parcimônia paramétrica e penalizando ensembles profundos por sobreajuste em microregimes.
-\end{enumerate}
-
-\subsection{Interpretabilidade via TreeSHAP}
-A aplicação dos valores SHAP aos modelos GBDT permitiu auditar quais variáveis exercem maior contribuição marginal na probabilidade estimada $\hat{P}(Y=1|X)$:
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.48\textwidth]{figures/shap_summary_PETR4.png}
-\caption{Decomposição aditiva dos valores SHAP para PETR4 (LightGBM).}
-\label{fig:shap_petr4}
-\end{figure}
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.48\textwidth]{figures/shap_summary_ITUB4.png}
-\caption{Decomposição aditiva dos valores SHAP para ITUB4 (LightGBM).}
-\label{fig:shap_itub4}
-\end{figure}
-
-Como evidenciado na Figura~\ref{fig:shap_petr4}, os atributos de maior impacto preditivo em PETR4 foram o desconto cíclico em relação à média móvel de 500 pregões ($z_{\text{SMA500}}$) e a volatilidade do dólar ($usdbRL\_vol\_20$). Para ITUB4 (Figura~\ref{fig:shap_itub4}), a taxa Selic anualizada e o spread acumulado prévio frente ao CDI concentraram a maior fatia de explicabilidade marginal.
-
-\subsection{Simulação Financeira de Backtest com Fricções}
-A simulação tática fora-da-amostra, incorporando emolumentos e taxas de liquidação de 0,03\% por troca de posição, confirmou a eficácia da regra de preservação de capital: ao realocar os recursos para 100\% de CDI durante períodos em que a probabilidade prevista situava-se abaixo de 0,52, os modelos protegeram o patrimônio nas fases mais agudas de queda de mercado.
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.48\textwidth]{figures/backtest_PETR4.png}
-\caption{Evolução patrimonial fora-da-amostra para PETR4 (Walk-Forward).}
-\label{fig:backtest_petr4}
-\end{figure}
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.48\textwidth]{figures/backtest_ITUB4.png}
-\caption{Evolução patrimonial fora-da-amostra para ITUB4 (Walk-Forward).}
-\label{fig:backtest_itub4}
-\end{figure}
-
-\section{Conclusões e Trabalhos Futuros}
-
-Este trabalho apresentou o desenvolvimento e a validação experimental de um motor modular em Python para análise preditiva e suporte à decisão tática na B3. A reformulação do problema preditivo para o horizonte de 60 pregões ($h=60$) com alvo de superação da taxa CDI eliminou o ruído de microestrutura inerente a dados diários e conferiu racionalidade econômica estrita às decisões.
-
-A validação comparativa demonstrou a versatilidade do arcabouço: modelos de GBDT destacaram-se em ativos cíclicos não-lineares (PETR4), enquanto modelos lineares regularizados prevaleceram em ativos bancários fortemente atrelados à curva de juros (ITUB4). O protocolo de Purging eliminou o risco de vazamento temporal em janelas sobrepostas, e a calibração de probabilidades proveu estimativas confiáveis para gestão de risco.
-
-Como trabalhos futuros associados à transição para a Fase 2 (Produto), propõe-se a integração do motor analítico a uma API REST em FastAPI acoplada a um painel em Streamlit, bem como a automação de rotinas diárias com dimensionamento de capital via Critério de Kelly Fracionário.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}
